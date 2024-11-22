@@ -1,0 +1,10 @@
+# Ignore the venv folder
+venv/
+
+# Ignore Python cache files
+*.pyc
+__pycache__/
+
+# Ignore logs or temporary files
+*.log
+*.tmp

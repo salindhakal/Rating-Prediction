@@ -1,0 +1,17 @@
+{
+  "cSpell.words": [
+    "anyio",
+    "colorama",
+    "fastapi",
+    "idna",
+    "joblib",
+    "numpy",
+    "pydantic",
+    "scikit",
+    "scipy",
+    "sniffio",
+    "starlette",
+    "threadpoolctl",
+    "uvicorn"
+  ]
+}
