@@ -10,7 +10,7 @@ const HomeCards = () => {
             <h2 className="text-2xl font-bold">Rating Prediction</h2>
             <p className="mt-2 mb-4">Prediction at your finger tip</p>
             <Link
-              to="/rating"
+              to="/playerrating"
               className="inline-block bg-black text-white rounded-lg px-4 py-2 hover:bg-gray-700"
             >
               View Ratings
