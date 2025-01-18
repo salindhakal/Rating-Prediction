@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import joblib
 import numpy as np
+import pandas as pd
 
 
 linear_model = joblib.load("models/linear_model.pkl")
@@ -19,6 +20,9 @@ selected_features = [
     'reactions', 'jumping', 'stamina', 'strength', 'positioning', 'vision', 
     'composure', 'interceptions', 'defensive_awareness'
 ]
+
+# Loading dataset
+dataset = pd.read_csv("data/player-data-full.csv") 
 
 # Initializing FastAPI app
 app = FastAPI()
@@ -45,18 +49,13 @@ class PlayerAttributes(BaseModel):
     interceptions: float
     defensive_awareness: float
 
-# POST endpoint for prediction
-@app.post("/predict")
-def predict(attributes: PlayerAttributes):
-
-    # Converting input attributes into an array (ensure the order of features matches)
-    features = np.array([[getattr(attributes, f) for f in selected_features]])
-
-    #imputation and scaling to the features
+# Helper function for prediction
+def calculate_rating(features):
+    # Impute and scale features
     features_imputed = imputer.transform(features)
     scaled_features = scaler.transform(features_imputed)
     
-    #predictions from each model
+    # Predictions from each model
     y_pred_linear = linear_model.predict(scaled_features)
     y_pred_rf = rf_model.predict(scaled_features)
     y_pred_dt = dt_model.predict(scaled_features)
@@ -78,10 +77,31 @@ def predict(attributes: PlayerAttributes):
         weight_xgb * y_pred_xgb +
         weight_svr * y_pred_svr
     )
-    
-    rounded_prediction = round(weighted_prediction[0], 2)
-    
-    # Returning the result as a JSON response
-    return {"rating": rounded_prediction}
+    return round(weighted_prediction[0], 2)
 
+# Endpoint 1: Direct feature input
+@app.post("/predict/by-features")
+def predict_by_features(attributes: PlayerAttributes):
+    # Convert attributes into a numpy array
+    features = np.array([[getattr(attributes, f) for f in selected_features]])
+    # Calculate rating
+    rating = calculate_rating(features)
+    return {"rating": rating}
+
+# Endpoint 2: Search by player name
+@app.get("/predict/by-name/{player_name}")
+def predict_by_name(player_name: str):
+    # Check if the player exists in the dataset
+    player_data = dataset[dataset['name'].str.lower() == player_name.lower()]
+    if player_data.empty:
+        raise HTTPException(status_code=404, detail="Player not found in the dataset.")
+    
+    # Retrieve player attributes
+    player_attributes = player_data[selected_features].values
+    if player_attributes.shape[0] > 1:
+        raise HTTPException(status_code=400, detail="Multiple players found. Be more specific.")
+    
+    # Calculate rating
+    rating = calculate_rating(player_attributes)
+    return {"player_name": player_name, "rating": rating}
 
