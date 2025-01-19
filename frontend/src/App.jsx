@@ -7,9 +7,9 @@ import PlayerInputPage from "./pages/PlayerInputPage";
 import ResultPage from "./pages/ResultPage";
 
 const App = () => {
-  // Function to send prediction request
-  const predictPlayerRating = async (features) => {
-    const res = await fetch("/api/predict", {
+  // Function to send prediction request for features
+  const predictPlayerRatingByFeatures = async (features) => {
+    const res = await fetch("/api/predict/by-features", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -19,6 +19,23 @@ const App = () => {
 
     if (!res.ok) {
       throw new Error("Failed to fetch prediction");
+    }
+
+    const data = await res.json();
+    return data.rating;
+  };
+
+  // Function to send prediction request by player name
+  const predictPlayerRatingByName = async (playerName) => {
+    const res = await fetch(
+      `/api/predict/by-name/${encodeURIComponent(playerName)}`,
+      {
+        method: "GET",
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch player rating");
     }
 
     const data = await res.json();
@@ -35,14 +52,18 @@ const App = () => {
           element: <HomePage />,
         },
         {
-          path: "playerrating",
+          path: "custom",
           element: (
-            <PlayerInputPage predictPlayerRating={predictPlayerRating} />
+            <PlayerInputPage
+              predictPlayerRating={predictPlayerRatingByFeatures}
+            />
           ),
         },
         {
-          path: "custom",
-          element: <Custom />,
+          path: "playerrating",
+          element: (
+            <Custom predictPlayerRatingByName={predictPlayerRatingByName} />
+          ),
         },
         {
           path: "result",
