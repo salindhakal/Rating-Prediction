@@ -22,7 +22,7 @@ const App = () => {
     }
 
     const data = await res.json();
-    return data.rating;
+    return data;
   };
 
   // Function to send prediction request by player name
@@ -39,7 +39,7 @@ const App = () => {
     }
 
     const data = await res.json();
-    return data.rating;
+    return data;
   };
 
   const router = createBrowserRouter([

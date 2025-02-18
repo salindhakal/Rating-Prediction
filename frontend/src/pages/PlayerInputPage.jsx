@@ -6,6 +6,7 @@ const PlayerInputPage = ({ predictPlayerRating }) => {
   const navigate = useNavigate();
 
   const initialFeatures = {
+    name: "Player Name",
     crossing: 50,
     finishing: 50,
     heading_accuracy: 50,
@@ -32,15 +33,24 @@ const PlayerInputPage = ({ predictPlayerRating }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFeatures({ ...features, [name]: parseInt(value, 10) });
+    if (name === "name") {
+      // If the field is 'name', treat the value as a string
+      setFeatures({ ...features, [name]: value });
+    } else {
+      // For other fields, parse the value as an integer
+      setFeatures({ ...features, [name]: parseInt(value, 10) });
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const rating = await predictPlayerRating(features);
-      navigate("/result", { state: { predictedRating: rating } });
+      const playerData = { ...features, name: features.name };
+      const { rating, attributes } = await predictPlayerRating(playerData);
+      navigate("/result", {
+        state: { predictedRating: rating, attributes },
+      });
     } catch (error) {
       console.error("Error predicting player rating", error);
     } finally {
@@ -60,32 +70,63 @@ const PlayerInputPage = ({ predictPlayerRating }) => {
           onSubmit={handleSubmit}
           className="space-y-5 max-w-3xl mx-auto w-full"
         >
-          {Object.keys(features).map((feature) => (
-            <div key={feature} className="grid grid-cols-4 gap-4 items-center">
-              <label
-                htmlFor={feature}
-                className="text-gray-700 font-medium capitalize text-right"
-              >
-                {feature.replace("_", " ")}
-              </label>
-              <div className="relative col-span-3">
-                <input
-                  type="range"
-                  id={feature}
-                  name={feature}
-                  min="0"
-                  max="100"
-                  value={features[feature]}
-                  onChange={handleChange}
-                  className="slider w-full"
-                />
-
-                <span className="absolute -top-4 right-0 text-gray-600 text-sm font-semibold">
-                  {features[feature]}
-                </span>
-              </div>
+          {/* Player Name Input */}
+          <div className="grid grid-cols-4 gap-4 items-center">
+            <label
+              htmlFor="name"
+              className="text-gray-700 font-medium capitalize text-right"
+            >
+              Player Name
+            </label>
+            <div className="col-span-3">
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={features.name}
+                onChange={handleChange}
+                className="input w-full"
+                placeholder="Enter player name"
+              />
             </div>
-          ))}
+          </div>
+
+          {/* Player Attributes */}
+          {Object.keys(features).map((feature) => {
+            if (feature !== "name") {
+              return (
+                <div
+                  key={feature}
+                  className="grid grid-cols-4 gap-4 items-center"
+                >
+                  <label
+                    htmlFor={feature}
+                    className="text-gray-700 font-medium capitalize text-right"
+                  >
+                    {feature.replace("_", " ")}
+                  </label>
+                  <div className="relative col-span-3">
+                    <input
+                      type="range"
+                      id={feature}
+                      name={feature}
+                      min="0"
+                      max="100"
+                      value={features[feature]}
+                      onChange={handleChange}
+                      className="slider w-full"
+                    />
+
+                    <span className="absolute -top-4 right-0 text-gray-600 text-sm font-semibold">
+                      {features[feature]}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })}
+
           <button
             type="submit"
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg w-full"

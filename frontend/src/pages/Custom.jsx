@@ -11,9 +11,11 @@ const Custom = ({ predictPlayerRatingByName }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const rating = await predictPlayerRatingByName(playerName);
+      const { rating, attributes } = await predictPlayerRatingByName(
+        playerName
+      );
       navigate("/result", {
-        state: { predictedRating: rating, player_name: playerName },
+        state: { predictedRating: rating, player_name: playerName, attributes },
       });
     } catch (error) {
       const errorMessage =
