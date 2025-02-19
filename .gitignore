@@ -24,4 +24,4 @@ dist-ssr
 *.sw?
 
 # Ignore large model files in the backend directory
-backend/models/large_model.pkl
+backend/models/rf_model_market.pkl
