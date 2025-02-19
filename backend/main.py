@@ -21,7 +21,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/admin/login")
 admin_username = "admin"
 admin_hashed_password = pwd_context.hash("admin123")
 
-# Load models
+# Load models for overall rating
 linear_model = joblib.load("models/linear_model.pkl")
 rf_model = joblib.load("models/random_forest_model.pkl")
 dt_model = joblib.load("models/decision_tree_model.pkl")
@@ -29,6 +29,15 @@ xgb_model = joblib.load("models/xgboost_model.pkl")
 svr_model = joblib.load("models/svr_model.pkl")
 scaler = joblib.load("models/scaler.pkl")
 imputer = joblib.load("models/imputer.pkl")
+
+# Load models for market value
+linear_model_market = joblib.load("models/linear_model_market.pkl")
+rf_model_market = joblib.load("models/rf_model_market.pkl")
+dt_model_market = joblib.load("models/dt_model_market.pkl")
+xgb_model_market = joblib.load("models/xgb_model_market.pkl")
+svr_model_market = joblib.load("models/svr_model_market.pkl")
+scaler_market = joblib.load("models/scaler_market.pkl")
+scaler_target = joblib.load("models/scaler_target.pkl")
 
 # Feature list
 selected_features = [
@@ -44,6 +53,9 @@ dataset = pd.read_csv(dataset_path)
 
 # Initialize FastAPI
 app = FastAPI()
+
+# Exchange rate: 1 Euro = 130 NPR
+EXCHANGE_RATE_EUR_TO_NPR = 130
 
 # Authentication functions
 def verify_password(plain_password, hashed_password):
@@ -120,9 +132,10 @@ def update_player(player_name: str, player: Player, admin: dict = Depends(get_cu
     dataset.to_csv(dataset_path, index=False)
     return {"message": "Player updated successfully"}
 
-# Prediction function
+# Prediction function for overall rating
 def calculate_rating(features):
-    features_imputed = imputer.transform(features)
+    features_df = pd.DataFrame(features, columns=selected_features)
+    features_imputed = imputer.transform(features_df)
     scaled_features = scaler.transform(features_imputed)
     y_pred_linear = linear_model.predict(scaled_features)
     y_pred_rf = rf_model.predict(scaled_features)
@@ -134,13 +147,40 @@ def calculate_rating(features):
                            0.4 * y_pred_svr)
     return round(weighted_prediction[0], 2)
 
+# Prediction function for market value
+def calculate_market_value(features, predicted_overall_rating):
+    features_with_rating = np.hstack((features, [[predicted_overall_rating]]))
+    features_df = pd.DataFrame(features_with_rating, columns=selected_features + ['predicted_overall_rating'])
+    scaled_features = scaler_market.transform(features_df)
+    y_pred_linear = linear_model_market.predict(scaled_features)
+    y_pred_rf = rf_model_market.predict(scaled_features)
+    y_pred_dt = dt_model_market.predict(scaled_features)
+    y_pred_xgb = xgb_model_market.predict(scaled_features)
+    y_pred_svr = svr_model_market.predict(scaled_features)
+    weighted_prediction = (0.1 * y_pred_linear + 0.3 * y_pred_rf +
+                           0.15 * y_pred_dt + 0.25 * y_pred_xgb +
+                           0.2 * y_pred_svr)
+    weighted_prediction_original = scaler_target.inverse_transform(weighted_prediction.reshape(-1, 1)).flatten()
+    market_value_npr = weighted_prediction_original[0] * EXCHANGE_RATE_EUR_TO_NPR
+    if market_value_npr < 100000:  # Less than 1 Lakh
+        formatted_value = f"{int(market_value_npr):,} NPR"
+    elif market_value_npr < 10000000:  # Less than 1 Crore
+        formatted_value = f"{int(market_value_npr / 100000):,} Lakh NPR"
+    elif market_value_npr < 1000000000:  # Less than 1 Arba
+        formatted_value = f"{int(market_value_npr / 10000000):,} Crore NPR"
+    elif market_value_npr < 100000000000:  # Less than 1 Kharba
+        formatted_value = f"{int(market_value_npr / 1000000000):,} Arba NPR"
+    else:
+        formatted_value = f"{int(market_value_npr / 100000000000):,} Kharba NPR"
+    return formatted_value
+
 # Predict by features
 @app.post("/predict/by-features")
 def predict_by_features(attributes: Player):
-    print("Received attributes:", attributes.model_dump())
     features = np.array([[getattr(attributes, f) for f in selected_features]])
     rating = calculate_rating(features)
-    return {"rating": rating, "attributes": attributes.model_dump()}
+    market_value = calculate_market_value(features, rating)
+    return {"rating": rating, "market_value": market_value, "attributes": attributes.dict()}
 
 # Predict by player name
 @app.get("/predict/by-name/{player_name}")
@@ -152,5 +192,6 @@ def predict_by_name(player_name: str):
     if player_attributes.shape[0] > 1:
         raise HTTPException(status_code=400, detail="Multiple players found. Be more specific.")
     rating = calculate_rating(player_attributes)
-    player_info = player_data [selected_features].iloc[0].to_dict()  #player attributes to dictionary
-    return {"player_name": player_name, "rating": rating, "attributes": player_info}
+    market_value = calculate_market_value(player_attributes, rating)
+    player_info = player_data[selected_features].iloc[0].to_dict()  # player attributes to dictionary
+    return {"player_name": player_name, "rating": rating, "market_value": market_value, "attributes": player_info}
